@@ -1,46 +1,101 @@
-import json
+# import io
+# import simplejson
 import pickle
 import pandas as pd
 import numpy as np
+from typing import List, Dict
 import uvicorn
-from fastapi import FastAPI
+# import shap
+from fastapi import FastAPI, Body, HTTPException, Request, Response
 from pydantic import BaseModel
 
-app = FastAPI(title='Car Price Prediction', version='1.0',
-             description='Linear Regression model is used for prediction')
+from fastapi.responses import ORJSONResponse
 
-with open("./model_saved.pkl", "rb") as f:
+app = FastAPI(default_response_class=ORJSONResponse, title='Loan Default  Prediction', version='1.0',
+             description='LighGBMClassifier model is used for prediction')
+
+with open("./model_reduced.pkl", "rb") as f:
     model = pickle.load(f)
+    
+data = pd.read_csv("reduced_train.csv")
 
 # Creating a class for the attributes input to the ML model.
 class Inputs(BaseModel):
-	PAYMENT_RATE : float
-	EXT_SOURCE_1 : float
-	EXT_SOURCE_2 : float
-	EXT_SOURCE_3 : float
-	DAYS_BIRTH   : float
-
-@app.get('/')
-@app.get('/home')
-
-def read_home():
+    """    
+    Class for the input data for new client.
     """
-    Home endpoint which can be used to test the availability of the application.
 
+    EXT_SOURCE_1       : float
+    EXT_SOURCE_3       : float
+    EXT_SOURCE_2       : float
+    DAYS_BIRTH         : float
+    AMT_GOODS_PRICE    : float
+    AMT_CREDIT         : float
+    AMT_ANNUITY        : float
+    DAYS_EMPLOYED      : float
+    CODE_GENDER        : float
+    AMT_INCOME_TOTAL   : float
+    DAYS_EMPLOYED_PERC : float
+    INCOME_CREDIT_PERC : float
+    ANNUITY_INCOME_PERC: float
+    PAYMENT_RATE       : float
+
+class ID(BaseModel):
     """
-    return {'message': 'System is healthy'}
+    Class for the ID of the client.
+    """
 
-@app.post("/predict")
-def predict(inputs: Inputs):
+    id_client : int
 
-    df = pd.DataFrame(columns=['PAYMENT_RATE','EXT_SOURCE_1','EXT_SOURCE_2','EXT_SOURCE_3','DAYS_BIRTH'],
-                      data=np.array([inputs.PAYMENT_RATE,inputs.EXT_SOURCE_1,inputs.EXT_SOURCE_2,
-                      inputs.EXT_SOURCE_3,inputs.DAYS_BIRTH]).reshape(1,5))
-    
-    result = model.predict_proba(df)
+@app.post("/predict_new/")
+async def predict_new(input_client: Inputs):
+    """
+    Predict the probability of target for new client using a trained model.
 
+    Parameters:
+        input_client (dict): A dictionary containing the input data for new client.
+
+    Returns:
+        float: A float representing the probability of target.
+    """
+    print(input_client)
+    df = pd.DataFrame([input_client.dict().values()], columns=input_client.dict().keys())
+    result = model.predict_proba(df)[0][1]
+    return result
+
+@app.post("/predict_previous/")
+async def predict_previous(id: ID):
+    """
+    Predict the probability of target for new client using a trained model.
+
+    Parameters:
+        input_client (dict): A dictionary containing the input data for new client.
+
+    Returns:
+        float: A float representing the probability of target.
+    """
+    data = pd.read_csv("reduced_train.csv")
+    data = data.iloc[[int(id.id_client)]]
+    result = model.predict_proba(data)[0][1]
     return result
 
 if __name__ == '__main__':
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
+# Fonction pour l'interpretatbilité du modèle à faire passer dans la partie backend
+# ---------------------------------------------------------------------------------
+# @app.post("/interpret/")
+# async def interpret(sv: List[float], feat_names : List[str]):
+#     # Create a SHAP summary plot
+#     #plot_html = shap.summary_plot(sv) #, show=False, plot_type="bar")
+#     return sv #{"plot_html": plot_html}
+
+# @app.get("/plot_global_shap/")
+# def plot():
+#     # create a SHAP summary plot
+#     plt_img = shap.summary_plot(shap_values)
+#     # encode the plot as a PNG image
+#     bytes_io = io.BytesIO()
+#     plt_img.save(bytes_io, format="PNG")
+#     # return the image as a response
+#     return Response(bytes_io.getvalue(), media_type="image/png")
