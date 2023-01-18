@@ -1,0 +1,5 @@
+# Content of the gitignore file
+
+/.DS_Store
+/__pycache__
+/.vscode 
