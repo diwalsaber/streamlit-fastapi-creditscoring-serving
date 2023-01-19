@@ -1,4 +1,4 @@
-# streamlit-fastapi-creditscoring
+# streamlit-fastapi-creditscoring-serving
 
 In this project, we serve a credit scoring app (based on Home Credit Data from Kaggle Competition)[https://www.kaggle.com/competitions/home-credit-default-risk]  using `FastAPI` for the backend service and `Streamlit` for the frontend service. `docker-compose` orchestrates the two services and allows communication between them.
 
