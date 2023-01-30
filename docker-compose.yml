@@ -7,8 +7,6 @@ services:
       - 8000:8000
     networks:
       - deploy_network
-    command: uvicorn main:app --host 0.0.0.0 --reload
-    restart: on-failure
     container_name: fastapi
 
   streamlit:

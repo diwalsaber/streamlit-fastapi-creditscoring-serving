@@ -1,24 +1,27 @@
-# import io
-# import simplejson
 import pickle
 import pandas as pd
 import numpy as np
-from typing import List, Dict
 import uvicorn
-# import shap
-from fastapi import FastAPI, Body, HTTPException, Request, Response
+from fastapi import FastAPI, Request
 from pydantic import BaseModel
 
-from fastapi.responses import ORJSONResponse
-
-app = FastAPI(default_response_class=ORJSONResponse, title='Loan Default  Prediction', version='1.0',
+app = FastAPI(title='Loan Default Prediction', version='1.0',
              description='LighGBMClassifier model is used for prediction')
 
-with open("./model_reduced.pkl", "rb") as f:
+with open("./model_saved.pkl", "rb") as f:
     model = pickle.load(f)
-    
-data = pd.read_csv("reduced_train.csv")
 
+# Charger l'objet "explainer"
+#with open('explainer.pkl', 'rb') as file:
+#    explainer = pickle.load(file)    
+
+# Charge les valeurs SHAP à partir du fichier
+#with open("shap_values.pkl", "rb") as f:
+#    shap_values = pickle.load(f)
+
+data = pd.read_csv("reduced_train.csv")
+#X_test = pd.read_csv("X_test.csv")
+#X_train = pd.read_csv("X_train.csv")
 # Creating a class for the attributes input to the ML model.
 class Inputs(BaseModel):
     """    
@@ -47,7 +50,18 @@ class ID(BaseModel):
 
     id_client : int
 
-@app.post("/predict_new/")
+
+@app.get('/')
+@app.get('/home')
+
+def read_home():
+    """
+    Home endpoint which can be used to test the availability of the application.
+
+    """
+    return {'message': 'System is healthy'}
+
+@app.post("/predict_new")
 async def predict_new(input_client: Inputs):
     """
     Predict the probability of target for new client using a trained model.
@@ -63,7 +77,7 @@ async def predict_new(input_client: Inputs):
     result = model.predict_proba(df)[0][1]
     return result
 
-@app.post("/predict_previous/")
+@app.post("/predict_previous")
 async def predict_previous(id: ID):
     """
     Predict the probability of target for new client using a trained model.
@@ -79,23 +93,17 @@ async def predict_previous(id: ID):
     result = model.predict_proba(data)[0][1]
     return result
 
+# @app.get("/explain")
+# def explain(request: Request):
+#     #shap_values = request.json()
+#     #X_train = request.json()
+#     #explainer = shap.Explainer(model[-1].predict_proba, X_train)
+#     #shap_values = explainer(X_test)
+#     #return {"expected_value": explainer.expected_value, "shap_values": shap_values.tolist()}
+#     return shap_values
+#     #return {"shap_values": shap_values.tolist()}
+
+
 if __name__ == '__main__':
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
-# Fonction pour l'interpretatbilité du modèle à faire passer dans la partie backend
-# ---------------------------------------------------------------------------------
-# @app.post("/interpret/")
-# async def interpret(sv: List[float], feat_names : List[str]):
-#     # Create a SHAP summary plot
-#     #plot_html = shap.summary_plot(sv) #, show=False, plot_type="bar")
-#     return sv #{"plot_html": plot_html}
-
-# @app.get("/plot_global_shap/")
-# def plot():
-#     # create a SHAP summary plot
-#     plt_img = shap.summary_plot(shap_values)
-#     # encode the plot as a PNG image
-#     bytes_io = io.BytesIO()
-#     plt_img.save(bytes_io, format="PNG")
-#     # return the image as a response
-#     return Response(bytes_io.getvalue(), media_type="image/png")
