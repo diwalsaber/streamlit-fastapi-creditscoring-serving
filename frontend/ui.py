@@ -32,6 +32,7 @@ with open('explainer.pkl', 'rb') as file:
 with open("shap_values.pkl", "rb") as f:
     shap_values = pickle.load(f)
 
+@st.cache
 def get_prediction_new(input):
     """
     Makes a request to the specified backend endpoint to retrieve a prediction
@@ -47,6 +48,7 @@ def get_prediction_new(input):
     response = requests.post(BACKEND + "predict_new", json=input)
     return response.json()
 
+@st.cache
 def get_prediction_previous(input):
     """
     Makes a request to the specified backend endpoint to retrieve a prediction
@@ -77,21 +79,21 @@ def get_prediction_previous(input):
 #     response = requests.post(BACKEND + "explain", json=input, headers={"Content-Type": "application/json"})
 #     return response.json()
 
-def get_explanation():
-    """
-    Makes a request to the specified backend endpoint to retrieve a prediction
-    based on the provided input data.
+# def get_explanation():
+#     """
+#     Makes a request to the specified backend endpoint to retrieve a prediction
+#     based on the provided input data.
 
-    Parameters:
-        input_data (dict): A dictionary containing the input data used to generate the prediction.
+#     Parameters:
+#         input_data (dict): A dictionary containing the input data used to generate the prediction.
 
-    Returns:
-        dict: A dictionary containing the prediction results if the request was successful and the response format is json.
+#     Returns:
+#         dict: A dictionary containing the prediction results if the request was successful and the response format is json.
 
-    """
-    response = requests.get(BACKEND + "explain")
-    shap_values = np.array(response.json()["shap_values"])
-    return shap_values
+#     """
+#     response = requests.get(BACKEND + "explain")
+#     shap_values = np.array(response.json()["shap_values"])
+#     return shap_values
 
 # def get_data():
 #     """
@@ -103,6 +105,7 @@ def get_explanation():
 #     """
 #     response = requests.get(BACKEND + "data")
 #     return response.json()
+
 
 def get_plot_univarie(data, feature, id_client):
     """
@@ -149,9 +152,8 @@ def get_linear_gauge(value):
                      {'range': [0.25, 0.5], 'color': "gray"},
                      {'range': [0.5, 0.75], 'color': "darkgray"},
                      {'range': [0.75, 1], 'color': "black"}],
-                 'threshold' : {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 0.5}}))
+                 'threshold' : {'line': {'color': "red", 'width': 4}, 'thickness': 0.75, 'value': 0.44}}))
     return fig
-
 
 def run():
     ######################################################################################################################
@@ -178,7 +180,6 @@ def run():
         st.sidebar.caption("Normalized score from external data source. Value between 0 and 1.")
         DAYS_BIRTH        = -(now - st.sidebar.date_input("Enter client date of birth :", value=datetime.date(1980,1,1), min_value = datetime.date(1970,1,1), max_value = datetime.date.today())).days
         st.sidebar.caption("Client's age in days at the time of application")
-        st.write(DAYS_BIRTH)
         AMT_GOODS_PRICE   = st.sidebar.text_input("Enter the price of the goods", value="20000")
         st.sidebar.caption("For consumer loans it is the price of the goods for which the loan is given.")
         AMT_CREDIT        = st.sidebar.text_input("Enter the amount of the credit", value="1000")
