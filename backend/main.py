@@ -25,6 +25,7 @@ from backend.models.predictor import ModelPredictor
 from backend.api.routes import router, set_predictor
 from backend.api.middleware import configure_security
 from backend.utils.logger import setup_logger
+from backend.schemas.prediction import ClientInput, ClientID
 
 # Setup logging
 logger = setup_logger(__name__)
@@ -115,27 +116,33 @@ async def global_exception_handler(request, exc):
 app.include_router(router)
 
 
-# Legacy endpoint redirects for backward compatibility
+# Legacy endpoint proxies for backward compatibility
 @app.get("/home")
 async def legacy_home():
-    """Redirect to health endpoint."""
-    return {"message": "Use /health endpoint for health checks"}
+    """Legacy health check endpoint - proxies to /health."""
+    from backend.api.routes import health_check
+    logger.warning("Legacy /home endpoint used - please migrate to /health")
+    return await health_check()
 
 
 @app.post("/predict_new")
-async def legacy_predict_new():
-    """Redirect to new endpoint."""
-    return {
-        "message": "This endpoint is deprecated. Use POST /api/v1/predict/new instead"
-    }
+async def legacy_predict_new(client_data: ClientInput):
+    """Legacy prediction endpoint - proxies to /api/v1/predict/new."""
+    from backend.api.routes import predict_new_client
+    logger.warning("Legacy /predict_new endpoint used - please migrate to /api/v1/predict/new")
+    response = await predict_new_client(client_data)
+    # Return just the probability for backward compatibility
+    return response.probability
 
 
 @app.post("/predict_previous")
-async def legacy_predict_previous():
-    """Redirect to new endpoint."""
-    return {
-        "message": "This endpoint is deprecated. Use POST /api/v1/predict/existing instead"
-    }
+async def legacy_predict_previous(client_id_input: ClientID):
+    """Legacy prediction endpoint - proxies to /api/v1/predict/existing."""
+    from backend.api.routes import predict_existing_client
+    logger.warning("Legacy /predict_previous endpoint used - please migrate to /api/v1/predict/existing")
+    response = await predict_existing_client(client_id_input)
+    # Return just the probability for backward compatibility
+    return response.probability
 
 
 if __name__ == "__main__":

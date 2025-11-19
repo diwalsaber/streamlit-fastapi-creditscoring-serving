@@ -18,9 +18,8 @@ services:
       - DATA_PATH=reduced_train.csv
       - CORS_ORIGINS=http://localhost:8501
     volumes:
-      # Mount data and models (create these directories and place files there)
-      - ./data/backend:/app/data:ro
-      - ./models:/app/models:ro
+      # Mount backend directory containing model and data files
+      - ./backend:/app:ro
     networks:
       - app-network
     healthcheck:
@@ -44,9 +43,8 @@ services:
       backend:
         condition: service_healthy
     volumes:
-      # Mount data for frontend
-      - ./data/frontend:/app/data:ro
-      - ./models:/app/models:ro
+      # Mount frontend directory containing data and model files
+      - ./frontend:/app:ro
     networks:
       - app-network
     healthcheck:
@@ -61,7 +59,3 @@ networks:
   app-network:
     driver: bridge
     name: credit-scoring-network
-
-volumes:
-  backend-data:
-  frontend-data:
