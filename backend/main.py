@@ -1,109 +1,161 @@
-import pickle
-import pandas as pd
-import numpy as np
+"""
+Credit Scoring API - FastAPI Backend
+
+A production-ready API for credit default prediction using LightGBM.
+Features:
+- Prediction for new and existing clients
+- Comprehensive error handling
+- Request validation
+- Health monitoring
+- Structured logging
+"""
+import os
+import sys
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 import uvicorn
-from fastapi import FastAPI, Request
-from pydantic import BaseModel
 
-app = FastAPI(title='Loan Default Prediction', version='1.0',
-             description='LighGBMClassifier model is used for prediction')
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
-with open("./model_saved.pkl", "rb") as f:
-    model = pickle.load(f)
+from backend.models.predictor import ModelPredictor
+from backend.api.routes import router, set_predictor
+from backend.api.middleware import configure_security
+from backend.utils.logger import setup_logger
+from backend.schemas.prediction import ClientInput, ClientID
 
-# Charger l'objet "explainer"
-#with open('explainer.pkl', 'rb') as file:
-#    explainer = pickle.load(file)    
+# Setup logging
+logger = setup_logger(__name__)
 
-# Charge les valeurs SHAP à partir du fichier
-#with open("shap_values.pkl", "rb") as f:
-#    shap_values = pickle.load(f)
+# Configuration from environment variables
+MODEL_PATH = os.getenv("MODEL_PATH", "model_saved.pkl")
+DATA_PATH = os.getenv("DATA_PATH", "reduced_train.csv")
+HOST = os.getenv("BACKEND_HOST", "0.0.0.0")
+PORT = int(os.getenv("BACKEND_PORT", "8000"))
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+RELOAD = os.getenv("BACKEND_RELOAD", "false").lower() == "true"
 
-data = pd.read_csv("reduced_train.csv")
-#X_test = pd.read_csv("X_test.csv")
-#X_train = pd.read_csv("X_train.csv")
-# Creating a class for the attributes input to the ML model.
-class Inputs(BaseModel):
-    """    
-    Class for the input data for new client.
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
-
-    EXT_SOURCE_1       : float
-    EXT_SOURCE_3       : float
-    EXT_SOURCE_2       : float
-    DAYS_BIRTH         : float
-    AMT_GOODS_PRICE    : float
-    AMT_CREDIT         : float
-    AMT_ANNUITY        : float
-    DAYS_EMPLOYED      : float
-    CODE_GENDER        : float
-    AMT_INCOME_TOTAL   : float
-    DAYS_EMPLOYED_PERC : float
-    INCOME_CREDIT_PERC : float
-    ANNUITY_INCOME_PERC: float
-    PAYMENT_RATE       : float
-
-class ID(BaseModel):
+    Application lifespan manager.
+    Handles startup and shutdown events.
     """
-    Class for the ID of the client.
-    """
+    # Startup
+    logger.info("Starting Credit Scoring API...")
+    logger.info(f"Environment: {os.getenv('ENVIRONMENT', 'production')}")
+    logger.info(f"Model path: {MODEL_PATH}")
+    logger.info(f"Data path: {DATA_PATH}")
 
-    id_client : int
+    try:
+        # Initialize predictor with model and data
+        predictor = ModelPredictor(
+            model_path=MODEL_PATH,
+            data_path=DATA_PATH
+        )
+
+        # Set the predictor in routes
+        set_predictor(predictor)
+
+        logger.info("✓ Model and data loaded successfully")
+        logger.info(f"✓ Training data: {predictor.data_size} clients")
+        logger.info("✓ API ready to accept requests")
+
+    except FileNotFoundError as e:
+        logger.error(f"✗ File not found: {e}")
+        logger.error("API will start but predictions will fail")
+        logger.error("Please ensure model and data files are available")
+    except Exception as e:
+        logger.error(f"✗ Startup error: {e}")
+        logger.error("API will start but may not function correctly")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Credit Scoring API...")
 
 
-@app.get('/')
-@app.get('/home')
+# Create FastAPI application
+app = FastAPI(
+    title="Credit Scoring API",
+    description=(
+        "Production-ready API for loan default prediction using LightGBM. "
+        "Provides predictions for both new and existing clients with "
+        "comprehensive error handling and monitoring."
+    ),
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
+)
 
-def read_home():
-    """
-    Home endpoint which can be used to test the availability of the application.
+# Configure security (CORS, rate limiting, security headers)
+configure_security(app)
 
-    """
-    return {'message': 'System is healthy'}
+
+# Exception handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler for unhandled errors."""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "type": type(exc).__name__
+        }
+    )
+
+
+# Include routers
+app.include_router(router)
+
+
+# Legacy endpoint proxies for backward compatibility
+@app.get("/home")
+async def legacy_home():
+    """Legacy health check endpoint - proxies to /health."""
+    from backend.api.routes import health_check
+    logger.warning("Legacy /home endpoint used - please migrate to /health")
+    return await health_check()
+
 
 @app.post("/predict_new")
-async def predict_new(input_client: Inputs):
-    """
-    Predict the probability of target for new client using a trained model.
+async def legacy_predict_new(client_data: ClientInput):
+    """Legacy prediction endpoint - proxies to /api/v1/predict/new."""
+    from backend.api.routes import predict_new_client
+    logger.warning("Legacy /predict_new endpoint used - please migrate to /api/v1/predict/new")
+    response = await predict_new_client(client_data)
+    # Return just the probability for backward compatibility
+    return response.probability
 
-    Parameters:
-        input_client (dict): A dictionary containing the input data for new client.
-
-    Returns:
-        float: A float representing the probability of target.
-    """
-    print(input_client)
-    df = pd.DataFrame([input_client.dict().values()], columns=input_client.dict().keys())
-    result = model.predict_proba(df)[0][1]
-    return result
 
 @app.post("/predict_previous")
-async def predict_previous(id: ID):
-    """
-    Predict the probability of target for new client using a trained model.
-
-    Parameters:
-        input_client (dict): A dictionary containing the input data for new client.
-
-    Returns:
-        float: A float representing the probability of target.
-    """
-    data = pd.read_csv("reduced_train.csv")
-    data = data.iloc[[int(id.id_client)]]
-    result = model.predict_proba(data)[0][1]
-    return result
-
-# @app.get("/explain")
-# def explain(request: Request):
-#     #shap_values = request.json()
-#     #X_train = request.json()
-#     #explainer = shap.Explainer(model[-1].predict_proba, X_train)
-#     #shap_values = explainer(X_test)
-#     #return {"expected_value": explainer.expected_value, "shap_values": shap_values.tolist()}
-#     return shap_values
-#     #return {"shap_values": shap_values.tolist()}
+async def legacy_predict_previous(client_id_input: ClientID):
+    """Legacy prediction endpoint - proxies to /api/v1/predict/existing."""
+    from backend.api.routes import predict_existing_client
+    logger.warning("Legacy /predict_previous endpoint used - please migrate to /api/v1/predict/existing")
+    response = await predict_existing_client(client_id_input)
+    # Return just the probability for backward compatibility
+    return response.probability
 
 
-if __name__ == '__main__':
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+if __name__ == "__main__":
+    """Run the application with uvicorn."""
+    logger.info(f"Starting server on {HOST}:{PORT}")
+    logger.info(f"Reload mode: {RELOAD}")
+    logger.info(f"Log level: {LOG_LEVEL}")
 
+    uvicorn.run(
+        "main:app",
+        host=HOST,
+        port=PORT,
+        reload=RELOAD,
+        log_level=LOG_LEVEL.lower(),
+        access_log=True
+    )

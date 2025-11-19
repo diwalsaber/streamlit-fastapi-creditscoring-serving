@@ -1,7 +1,6 @@
-import requests
 import numpy as np
-import streamlit as st 
-import pandas as pd 
+import streamlit as st
+import pandas as pd
 import datetime
 import shap
 import pickle
@@ -10,59 +9,69 @@ import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit.components.v1 as components
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from frontend.utils.api_client import get_api_client
+
 now = datetime.date.today()
-
-
-# Deployement on local machine
-#BACKEND = "http://localhost:8000/"
-
-# Deployement on docker
-BACKEND = "http://fastapi:8000/"
 
 st.set_option('deprecation.showPyplotGlobalUse', False)
 st.set_page_config(layout="wide")
 
+# Initialize API client
+api_client = get_api_client()
 
+# Load data and models
 data = pd.read_csv("result_for_plot.csv", dtype='float')
 # Charger l'objet "explainer"
 with open('explainer.pkl', 'rb') as file:
-    explainer = pickle.load(file)    
+    explainer = pickle.load(file)
 
 # Charge les valeurs SHAP à partir du fichier
 with open("shap_values.pkl", "rb") as f:
     shap_values = pickle.load(f)
 
-@st.cache
-def get_prediction_new(input):
+
+@st.cache_data
+def get_prediction_new(input_data):
     """
-    Makes a request to the specified backend endpoint to retrieve a prediction
-    based on the provided input data.
+    Get prediction for a new client using the backend API.
 
     Parameters:
-        input_data (dict): A dictionary containing the input data used to generate the prediction.
+        input_data (dict): Dictionary containing client features.
 
     Returns:
-        dict: A dictionary containing the prediction results if the request was successful and the response format is json.
-
+        dict: Prediction response with probability and risk level.
     """
-    response = requests.post(BACKEND + "predict_new", json=input)
-    return response.json()
+    try:
+        response = api_client.predict_new_client(input_data)
+        return response
+    except Exception as e:
+        st.error(f"Prediction failed: {str(e)}")
+        return None
 
-@st.cache
-def get_prediction_previous(input):
+
+@st.cache_data
+def get_prediction_previous(client_id):
     """
-    Makes a request to the specified backend endpoint to retrieve a prediction
-    based on the provided input data.
+    Get prediction for an existing client using the backend API.
 
     Parameters:
-        input_data (dict): A dictionary containing the input data used to generate the prediction.
+        client_id (int): Client ID (row index in training data).
 
     Returns:
-        dict: A dictionary containing the prediction results if the request was successful and the response format is json.
-
+        dict: Prediction response with probability and risk level.
     """
-    response = requests.post(BACKEND + "predict_previous", json=input, headers={"Content-Type": "application/json"})
-    return response.json()
+    try:
+        response = api_client.predict_existing_client(client_id)
+        return response
+    except Exception as e:
+        st.error(f"Prediction failed: {str(e)}")
+        return None
 
 # def get_explanation(input):
 #     """
@@ -224,14 +233,18 @@ def run():
 
         if btn_predict:
             with st.spinner("Waiting for the prediction..."):
-                prediction = get_prediction_new(input_dict)
-                #st.success(f"The prediction from model: {prediction}")
-                st.write("The prediction from model: ", prediction)
-                #response = requests.post(backend, json=input_dict)
-                #prediction = response.text
-                #st.success(f"The prediction from model: {prediction}")
-                fig = get_linear_gauge(prediction)  
-                st.plotly_chart(fig)
+                prediction_response = get_prediction_new(input_dict)
+                if prediction_response:
+                    probability = prediction_response['probability']
+                    risk_level = prediction_response.get('risk_level', 'unknown')
+
+                    st.success(f"Prediction: {probability:.2%} probability of default")
+                    st.info(f"Risk Level: {risk_level.upper()}")
+
+                    fig = get_linear_gauge(probability)
+                    st.plotly_chart(fig)
+                else:
+                    st.error("Failed to get prediction. Please check the logs.")
         
         # Explanation
         if btn_explain:
@@ -258,17 +271,28 @@ def run():
         id_client = st.sidebar.text_input("Enter client ID", value="1")
         st.sidebar.caption("Enter ID client between 0 and 307507 include please.")
 
-        input_id = {'id_client': id_client}
         btn_predict = st.sidebar.button("Predict")
         btn_explain = st.sidebar.button("Explain")
 
         # Prediction
         if btn_predict:
             with st.spinner("Waiting for the prediction..."):
-                prediction = get_prediction_previous(input_id)
-                st.write("The prediction from model: ", prediction)
-                fig = get_linear_gauge(prediction)  
-                st.plotly_chart(fig)
+                try:
+                    prediction_response = get_prediction_previous(int(id_client))
+                    if prediction_response:
+                        probability = prediction_response['probability']
+                        risk_level = prediction_response.get('risk_level', 'unknown')
+                        client_id_returned = prediction_response.get('client_id')
+
+                        st.success(f"Prediction for client #{client_id_returned}: {probability:.2%} probability of default")
+                        st.info(f"Risk Level: {risk_level.upper()}")
+
+                        fig = get_linear_gauge(probability)
+                        st.plotly_chart(fig)
+                    else:
+                        st.error("Failed to get prediction. Please check the client ID.")
+                except ValueError:
+                    st.error("Please enter a valid numeric client ID.")
 
 
         # Explanation
