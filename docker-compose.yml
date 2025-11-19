@@ -5,7 +5,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: credit-scoring-backend
+    container_name: credit-risk-api-backend
     ports:
       - "8000:8000"
     environment:
@@ -34,7 +34,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: credit-scoring-frontend
+    container_name: credit-risk-api-frontend
     ports:
       - "8501:8501"
     environment:
@@ -58,4 +58,4 @@ services:
 networks:
   app-network:
     driver: bridge
-    name: credit-scoring-network
+    name: credit-risk-api-network

@@ -1,6 +1,6 @@
 # Credit Scoring Application
 
-[![CI/CD Pipeline](https://github.com/your-org/credit-scoring/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/credit-scoring/actions)
+[![CI/CD Pipeline](https://github.com/your-org/credit-risk-api/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/credit-risk-api/actions)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -61,8 +61,8 @@ Production-ready credit scoring application for loan default prediction using Li
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/your-org/credit-scoring.git
-   cd credit-scoring
+   git clone https://github.com/your-org/credit-risk-api.git
+   cd credit-risk-api
    ```
 
 2. **Download model and data files**

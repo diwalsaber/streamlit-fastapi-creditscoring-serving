@@ -186,5 +186,5 @@ response = requests.post("http://backend:8000/predict_new", json=data)
 
 ---
 
-[2.0.0]: https://github.com/your-org/credit-scoring/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/your-org/credit-scoring/releases/tag/v1.0.0
+[2.0.0]: https://github.com/your-org/credit-risk-api/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/your-org/credit-risk-api/releases/tag/v1.0.0

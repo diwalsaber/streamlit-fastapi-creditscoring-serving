@@ -29,8 +29,8 @@ We are committed to providing a welcoming and inclusive experience for everyone.
 
 1. **Fork and clone the repository**
    ```bash
-   git clone https://github.com/your-username/credit-scoring.git
-   cd credit-scoring
+   git clone https://github.com/your-username/credit-risk-api.git
+   cd credit-risk-api
    ```
 
 2. **Create a virtual environment**
